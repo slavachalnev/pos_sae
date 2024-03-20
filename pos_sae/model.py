@@ -8,18 +8,18 @@ https://github.com/ArthurConmy/sae/blob/main/sae/model.py
 import gzip
 import os
 import pickle
-from typing import Any
+from typing import Any, Optional
+import json
 
 import einops
 import torch
 from torch import nn
 from transformer_lens.hook_points import HookedRootModule, HookPoint
 
-from config import SAEConfig
+from pos_sae.config import SAEConfig
 
 
 class SparseAutoencoder(HookedRootModule):
-    """ """
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class SparseAutoencoder(HookedRootModule):
         self.d_sae = cfg.d_sae
         self.l1_coefficient = cfg.l1_coefficient
         self.lp_norm = cfg.lp_norm
-        self.dtype = cfg.dtype
+        self.dtype = torch.float32 # for now.
         self.device = cfg.device
 
         # NOTE: if using resampling neurons method, you must ensure that we initialise the weights in the order W_enc, b_enc, W_dec, b_dec
@@ -70,7 +70,7 @@ class SparseAutoencoder(HookedRootModule):
 
         self.setup()  # Required for `HookedRootModule`
 
-    def forward(self, x: torch.Tensor, dead_neuron_mask: torch.Tensor | None = None):
+    def forward(self, x: torch.Tensor, dead_neuron_mask: Optional[torch.Tensor] = None):
         # move x to correct dtype
         x = x.to(self.dtype)
         sae_in = self.hook_sae_in(
@@ -169,46 +169,43 @@ class SparseAutoencoder(HookedRootModule):
         """
         Basic save function for the model. Saves the model's state_dict and the config used to train it.
         """
+        raise NotImplementedError()
 
-        assert path.endswith(".pt")
+        # # check if path exists
+        # folder = os.path.dirname(path)
+        # os.makedirs(folder, exist_ok=True)
 
-        # check if path exists
-        folder = os.path.dirname(path)
-        os.makedirs(folder, exist_ok=True)
+        # state_dict = {"cfg": self.cfg, "state_dict": self.state_dict()}
 
-        state_dict = {"cfg": self.cfg, "state_dict": self.state_dict()}
-
-        torch.save(state_dict, path)
-        print(f"Saved model to {path}")
+        # torch.save(state_dict, path)
+        # print(f"Saved model to {path}")
 
     @classmethod
-    def load_from_pretrained(cls, path: str):
+    def load_from_pretrained(cls, dir_path: str):
         """
         Load function for the model. Loads the model's state_dict and the config used to train it.
         This method can be called directly on the class, without needing an instance.
         """
+        model_path = os.path.join(dir_path, "model.pt")
+        cfg_path = os.path.join(dir_path, "cfg.json")
 
-        # Ensure the file exists
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"No file found at specified path: {path}")
+        with open(cfg_path, "r") as f:
+            cfg_d = json.load(f)
 
-        assert path.endswith(".pt")
+        valid_keys = SAEConfig.__annotations__.keys()
+        valid_cfg_d = {key: cfg_d.pop(key) for key in list(cfg_d.keys()) if key in valid_keys}
 
-        # Load the state dict
-        if torch.backends.mps.is_available():
-            state_dict = torch.load(path, map_location="mps")
-            state_dict["cfg"].device = "mps"
-        else:
-            state_dict = torch.load(path)
+        cfg = SAEConfig(**valid_cfg_d)
 
-        # Ensure the loaded state contains both 'cfg' and 'state_dict'
-        if "cfg" not in state_dict or "state_dict" not in state_dict:
-            raise ValueError(
-                "The loaded state dictionary must contain 'cfg' and 'state_dict' keys"
-            )
+        ignored_keys = list(cfg_d.keys())
+        if ignored_keys:
+            print(f"ignored keys: {ignored_keys}")
+
+        state_dict = torch.load(model_path, map_location="cpu")
+        cfg.device = "cpu"
 
         # Create an instance of the class using the loaded configuration
-        instance = cls(cfg=state_dict["cfg"])
-        instance.load_state_dict(state_dict["state_dict"])
+        instance = cls(cfg)
+        instance.load_state_dict(state_dict)
 
         return instance

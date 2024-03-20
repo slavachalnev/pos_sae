@@ -1,6 +1,6 @@
 from abc import ABC
-from dataclasses import dataclass
-from typing import Any, Optional, cast
+from dataclasses import dataclass, asdict
+from typing import Any, Optional, cast, Union
 
 import torch
 
@@ -44,8 +44,8 @@ class SAEConfig:
 
     # Misc
     checkpoint_path: str = "checkpoints"
-    device: str | torch.device = "cpu"
-    dtype: torch.dtype = torch.float32
+    device: str = "cpu"
+    # dtype: torch.dtype = torch.float32
 
     def __post_init__(self):
 
@@ -58,7 +58,6 @@ class SAEConfig:
         if self.run_name is None:
             self.run_name = f"{self.d_sae}-L1-{self.l1_coefficient}-LR-{self.lr}"
 
-        self.device = torch.device(self.device)
 
         ##### hmmmm
         unique_id = cast(
@@ -68,4 +67,7 @@ class SAEConfig:
         #####
 
         print(f"Run name: {self.run_name}")
+    
+    def to_dict(self):
+        return asdict(self)
 
