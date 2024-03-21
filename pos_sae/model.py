@@ -70,7 +70,7 @@ class SparseAutoencoder(HookedRootModule):
 
         self.setup()  # Required for `HookedRootModule`
 
-    def forward(self, x: torch.Tensor, dead_neuron_mask: Optional[torch.Tensor] = None):
+    def forward(self, x: torch.Tensor):
         # move x to correct dtype
         x = x.to(self.dtype)
         sae_in = self.hook_sae_in(

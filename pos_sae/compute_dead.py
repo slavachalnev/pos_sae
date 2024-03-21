@@ -11,10 +11,6 @@ from pos_sae.model import SparseAutoencoder
 
 @torch.no_grad()
 def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batches: int = 100, per_step: bool = False):
-    # load dataset, data loader
-    # run gpt through the dataset, caching appropriate layer activations
-    # run activations through SAE, tallying neuron activations.
-    # return frequencies of neuron activations.
     max_len = 32
     batch_size = 8
     layer = sae.cfg.hook_point_layer
