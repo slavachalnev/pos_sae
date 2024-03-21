@@ -51,7 +51,7 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
 def main():
     layer = 5
     max_len = 32
-    batch_size = 64
+    batch_size = 128
     device = "cuda" if torch.cuda.is_available() else "mps"
 
     pos_idxs = [1, 2, 3, 4, 8, 16]
@@ -76,6 +76,7 @@ def main():
     loader = DataLoader(tokenized_dataset, batch_size=batch_size)
 
     wandb.init(project="pos_sae")
+    wandb.config.update(saes[0][0].cfg)
 
     train(gpt, saes, loader, layer=layer)
 
