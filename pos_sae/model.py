@@ -16,7 +16,7 @@ import torch
 from torch import nn
 from transformer_lens.hook_points import HookedRootModule, HookPoint
 
-from pos_sae.config import SAEConfig
+from config import SAEConfig
 
 
 class SparseAutoencoder(HookedRootModule):
@@ -39,7 +39,6 @@ class SparseAutoencoder(HookedRootModule):
         self.dtype = torch.float32 # for now.
         self.device = cfg.device
 
-        # NOTE: if using resampling neurons method, you must ensure that we initialise the weights in the order W_enc, b_enc, W_dec, b_dec
         self.W_enc = nn.Parameter(
             torch.nn.init.kaiming_uniform_(
                 torch.empty(self.d_in, self.d_sae, dtype=self.dtype, device=self.device)
@@ -165,20 +164,19 @@ class SparseAutoencoder(HookedRootModule):
             "d_sae, d_sae d_in -> d_sae d_in",
         )
 
-    def save_model(self, path: str):
+    def save_model(self, dir_path: str):
         """
-        Basic save function for the model. Saves the model's state_dict and the config used to train it.
+        Save the model's state_dict and the config used to train it.
         """
-        raise NotImplementedError()
+        os.makedirs(dir_path, exist_ok=True)
+        # Save the model state_dict
+        torch.save(self.state_dict(), os.path.join(dir_path, "model.pt"))
 
-        # # check if path exists
-        # folder = os.path.dirname(path)
-        # os.makedirs(folder, exist_ok=True)
+        # Save the config as a JSON file
+        cfg_dict = self.cfg.to_dict()
+        with open(os.path.join(dir_path, "cfg.json"), "w") as f:
+            json.dump(cfg_dict, f, indent=2)
 
-        # state_dict = {"cfg": self.cfg, "state_dict": self.state_dict()}
-
-        # torch.save(state_dict, path)
-        # print(f"Saved model to {path}")
 
     @classmethod
     def load_from_pretrained(cls, dir_path: str):

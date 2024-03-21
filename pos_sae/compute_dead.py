@@ -5,8 +5,8 @@ from datasets import load_dataset
 from transformer_lens import HookedTransformer
 from tqdm import tqdm
 
-from pos_sae.config import SAEConfig
-from pos_sae.model import SparseAutoencoder
+from config import SAEConfig
+from model import SparseAutoencoder
 
 
 @torch.no_grad()

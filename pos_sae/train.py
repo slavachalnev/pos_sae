@@ -3,8 +3,8 @@ import torch
 import os
 import json
 
-from pos_sae.model import SparseAutoencoder
-from pos_sae.compute_dead import get_freq_single_sae
+from model import SparseAutoencoder
+from compute_dead import get_freq_single_sae
 
 from transformer_lens import HookedTransformer
 from transformer_lens.utils import get_act_name
@@ -34,36 +34,35 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
         if i % 10 == 0:
             print(f"step {i}")
 
-        for sae, pos in autoencoders:
+        for j, (sae, pos) in enumerate(autoencoders):
             sae: SparseAutoencoder
 
-            optimizers[pos].zero_grad()
+            optimizers[j].zero_grad()
 
             input_to_sae = gpt_cache[:, pos, :]
             sae_out, feature_acts, loss, mse_loss, l1_loss = sae(input_to_sae)
 
             loss.backward()
-            optimizers[pos].step()
+            optimizers[j].step()
 
             if i % 10 == 0:
                 print(f"Loss for {pos}: {loss.item()}")
+        
+        if i % 10000 == 0:
+            print("Saving models")
+            for j, (sae, pos) in enumerate(autoencoders):
+                sae.save_model(f"checkpoints/{layer}/sae_pos_{pos}_step_{i}")
 
         if i == 100:
             break
 
-
-# def save_checkpoint(saes: list[tuple[SparseAutoencoder, int]], checkpoint_dir, step):
-#     for sae, pos in saes:
-
-#         checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_pos{pos}_step{step}.pt")
-#         torch.save(sae.state_dict(), checkpoint_path)
-#         print(f"Saved checkpoint for position {pos} at step {step}")
 
 
 def main():
     layer = 5
     max_len = 32
     batch_size = 8
+    device = 'mps'
 
     pos_idxs = [1, 2, 3, 4, 8, 16]
     checkpoint_dir = f"converted_checkpoints/final_sparse_autoencoder_gpt2-small_blocks.{layer}.hook_resid_pre_24576"
@@ -71,6 +70,7 @@ def main():
 
     for pos in pos_idxs:
         sae = SparseAutoencoder.load_from_pretrained(checkpoint_dir)
+        sae.to(device)
         saes.append((sae, pos))
 
     gpt = HookedTransformer.from_pretrained("gpt2-small")
@@ -83,5 +83,8 @@ def main():
     tokenized_dataset = dataset.map(tok_func, batched=True, remove_columns=["text"])
     loader = DataLoader(tokenized_dataset, batch_size=batch_size)
 
-    train(gpt, saes, loader)
+    train(gpt, saes, loader, layer=layer)
 
+
+if __name__ == "__main__":
+    main()
