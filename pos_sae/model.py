@@ -201,6 +201,7 @@ class SparseAutoencoder(HookedRootModule):
 
         state_dict = torch.load(model_path, map_location="cpu")
         cfg.device = "cpu"
+        cfg.from_pretrained_path = dir_path
 
         # Create an instance of the class using the loaded configuration
         instance = cls(cfg)

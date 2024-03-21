@@ -12,7 +12,7 @@ from compute_dead import get_freq_single_sae
 
 
 def train(gpt: HookedTransformer, autoencoders, loader, layer):
-    optimizers = [torch.optim.Adam(sae.parameters(), lr=1e-3) for sae, _ in autoencoders]
+    optimizers = [torch.optim.Adam(sae.parameters(), lr=sae.cfg.lr) for sae, _ in autoencoders]
 
     gpt_cache = None # becomes shape (batch_size, max_len, d_model)
     def gpt_acts_hook(acts, hook):
@@ -51,8 +51,8 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
 def main():
     layer = 5
     max_len = 32
-    batch_size = 32
-    device = 'mps'
+    batch_size = 64
+    device = "cuda" if torch.cuda.is_available() else "mps"
 
     pos_idxs = [1, 2, 3, 4, 8, 16]
     checkpoint_dir = f"converted_checkpoints/final_sparse_autoencoder_gpt2-small_blocks.{layer}.hook_resid_pre_24576"
@@ -60,6 +60,8 @@ def main():
 
     for pos in pos_idxs:
         sae = SparseAutoencoder.load_from_pretrained(checkpoint_dir)
+        sae.cfg.context_size = max_len
+        sae.cfg.train_batch_size = batch_size
         sae.to(device)
         saes.append((sae, pos))
 
@@ -75,7 +77,7 @@ def main():
 
     wandb.init(project="pos_sae")
 
-    train(gpt, saes, loader, layer=layer)
+    train(gpt, saes, loader, layer=layer, lr=lr)
 
 
 if __name__ == "__main__":
