@@ -3,13 +3,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 from transformer_lens import HookedTransformer
+from tqdm import tqdm
 
 from pos_sae.config import SAEConfig
 from pos_sae.model import SparseAutoencoder
 
 
 @torch.no_grad()
-def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer):
+def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batches: int = 100):
     # load dataset, data loader
     # run gpt through the dataset, caching appropriate layer activations
     # run activations through SAE, tallying neuron activations.
@@ -25,20 +26,33 @@ def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer):
     tokenized_dataset = dataset.map(tok_func, batched=True, remove_columns=["text"])
     loader = DataLoader(tokenized_dataset, batch_size=batch_size)
 
-    cache = None
+    freqs = torch.zeros(sae.cfg.d_sae, device=sae.W_enc.device)
 
-    def write_acts_hook(acts, hook):
-        nonlocal cache
-        cache = acts
+    gpt_cache = None # becomes shape (batch_size, max_len, d_model)
+    sae_cache = None # becomes shape (batch_size, max_len, d_sae)
 
-    for batch in loader:
+    def gpt_acts_hook(acts, hook):
+        nonlocal gpt_cache
+        gpt_cache = acts
+
+    def sae_acts_hook(acts, hook):
+        nonlocal sae_cache
+        sae_cache = acts
+
+    for i, batch in tqdm(enumerate(loader), total=n_batches): 
         input_ids = batch["input_ids"]
 
-        gpt.run_with_hooks(input_ids, fwd_hooks=[(f"blocks.{layer}.hook_resid_pre", write_acts_hook)])
+        gpt.run_with_hooks(input_ids, fwd_hooks=[(f"blocks.{layer}.hook_resid_pre", gpt_acts_hook)])
+        sae.run_with_hooks(gpt_cache, fwd_hooks=[("hook_hidden_post", sae_acts_hook)])
 
-        break
+        # tally sae neuron activations
+        sae_activated = (sae_cache > 0).float()
+        freqs += sae_activated.sum(dim=(0, 1))
 
-    print(cache)
+        if i == n_batches:
+            break
+
+    return freqs / (i * batch_size * max_len)
 
 
 @torch.no_grad()
