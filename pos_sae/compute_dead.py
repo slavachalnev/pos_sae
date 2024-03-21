@@ -10,7 +10,7 @@ from pos_sae.model import SparseAutoencoder
 
 
 @torch.no_grad()
-def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batches: int = 100):
+def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batches: int = 100, per_step: bool = False):
     # load dataset, data loader
     # run gpt through the dataset, caching appropriate layer activations
     # run activations through SAE, tallying neuron activations.
@@ -26,7 +26,10 @@ def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batch
     tokenized_dataset = dataset.map(tok_func, batched=True, remove_columns=["text"])
     loader = DataLoader(tokenized_dataset, batch_size=batch_size)
 
-    freqs = torch.zeros(sae.cfg.d_sae, device=sae.W_enc.device)
+    if per_step:
+        freqs = torch.zeros((max_len, sae.cfg.d_sae), device=sae.W_enc.device)
+    else:
+        freqs = torch.zeros(sae.cfg.d_sae, device=sae.W_enc.device)
 
     gpt_cache = None # becomes shape (batch_size, max_len, d_model)
     sae_cache = None # becomes shape (batch_size, max_len, d_sae)
@@ -45,14 +48,20 @@ def get_freq_single_sae(sae: SparseAutoencoder , gpt: HookedTransformer, n_batch
         gpt.run_with_hooks(input_ids, fwd_hooks=[(f"blocks.{layer}.hook_resid_pre", gpt_acts_hook)])
         sae.run_with_hooks(gpt_cache, fwd_hooks=[("hook_hidden_post", sae_acts_hook)])
 
-        # tally sae neuron activations
+        # tally sae activations
         sae_activated = (sae_cache > 0).float()
-        freqs += sae_activated.sum(dim=(0, 1))
+        if per_step:
+            freqs += sae_activated.sum(dim=0)
+        else:
+            freqs += sae_activated.sum(dim=(0, 1))
 
         if i == n_batches:
             break
-
-    return freqs / (i * batch_size * max_len)
+    
+    if per_step:
+        return freqs / (n_batches * batch_size)
+    else:
+        return freqs / (i * batch_size * max_len)
 
 
 @torch.no_grad()
