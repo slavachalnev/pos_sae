@@ -1,21 +1,14 @@
+import pandas as pd
+import wandb
 import torch
-
-import os
-import json
-
-from model import SparseAutoencoder
-from compute_dead import get_freq_single_sae
+from datasets import load_dataset
+from torch.utils.data import DataLoader
 
 from transformer_lens import HookedTransformer
 from transformer_lens.utils import get_act_name
 
-import plotly.express as px
-from plotly.subplots import make_subplots
-
-import pandas as pd
-
-from datasets import load_dataset
-from torch.utils.data import DataLoader
+from model import SparseAutoencoder
+from compute_dead import get_freq_single_sae
 
 
 def train(gpt: HookedTransformer, autoencoders, loader, layer):
@@ -45,23 +38,20 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
             loss.backward()
             optimizers[j].step()
 
-            if i % 10 == 0:
+            if i % 100 == 0:
                 print(f"Loss for {pos}: {loss.item()}")
+                wandb.log({f"loss_pos_{pos}": loss.item()})
         
         if i % 10000 == 0:
             print("Saving models")
             for j, (sae, pos) in enumerate(autoencoders):
                 sae.save_model(f"checkpoints/{layer}/sae_pos_{pos}_step_{i}")
 
-        if i == 100:
-            break
-
-
 
 def main():
     layer = 5
     max_len = 32
-    batch_size = 8
+    batch_size = 32
     device = 'mps'
 
     pos_idxs = [1, 2, 3, 4, 8, 16]
@@ -82,6 +72,8 @@ def main():
     dataset = load_dataset("Skylion007/openwebtext", split="train", streaming=True)
     tokenized_dataset = dataset.map(tok_func, batched=True, remove_columns=["text"])
     loader = DataLoader(tokenized_dataset, batch_size=batch_size)
+
+    wandb.init(project="pos_sae")
 
     train(gpt, saes, loader, layer=layer)
 
