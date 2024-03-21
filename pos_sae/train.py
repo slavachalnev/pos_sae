@@ -77,7 +77,7 @@ def main():
 
     wandb.init(project="pos_sae")
 
-    train(gpt, saes, loader, layer=layer, lr=lr)
+    train(gpt, saes, loader, layer=layer)
 
 
 if __name__ == "__main__":
