@@ -43,7 +43,6 @@ class SAEConfig:
     wandb_log_frequency: int = 100
 
     # Misc
-    checkpoint_path: str = "checkpoints"
     device: str = "cpu"
     # dtype: torch.dtype = torch.float32
 
@@ -57,14 +56,6 @@ class SAEConfig:
 
         if self.run_name is None:
             self.run_name = f"{self.d_sae}-L1-{self.l1_coefficient}-LR-{self.lr}"
-
-
-        ##### hmmmm
-        unique_id = cast(
-            Any, wandb
-        ).util.generate_id()  # not sure why this type is erroring
-        self.checkpoint_path = f"{self.checkpoint_path}/{unique_id}"
-        #####
 
         print(f"Run name: {self.run_name}")
     
