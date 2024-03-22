@@ -50,6 +50,9 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
             print("Saving models")
             for j, (sae, pos) in enumerate(autoencoders):
                 sae.save_model(f"{checkpoint_dir}/sae_pos_{pos}_step_{i}")
+    print("Final save")
+    for j, (sae, pos) in enumerate(autoencoders):
+        sae.save_model(f"{checkpoint_dir}/sae_pos_{pos}_step_{i}")
 
 
 def main():
