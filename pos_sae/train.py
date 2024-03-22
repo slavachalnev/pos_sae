@@ -1,3 +1,4 @@
+import datetime
 import pandas as pd
 import wandb
 import torch
@@ -12,6 +13,9 @@ from compute_dead import get_freq_single_sae
 
 
 def train(gpt: HookedTransformer, autoencoders, loader, layer):
+    current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    checkpoint_dir = f"checkpoints/{current_datetime}_{layer}"
+
     optimizers = [torch.optim.Adam(sae.parameters(), lr=sae.cfg.lr) for sae, _ in autoencoders]
 
     gpt_cache = None # becomes shape (batch_size, max_len, d_model)
@@ -45,13 +49,13 @@ def train(gpt: HookedTransformer, autoencoders, loader, layer):
         if i % 10000 == 0:
             print("Saving models")
             for j, (sae, pos) in enumerate(autoencoders):
-                sae.save_model(f"checkpoints/{layer}/sae_pos_{pos}_step_{i}")
+                sae.save_model(f"{checkpoint_dir}/sae_pos_{pos}_step_{i}")
 
 
 def main():
     layer = 5
     max_len = 32
-    batch_size = 128
+    batch_size = 256
     device = "cuda" if torch.cuda.is_available() else "mps"
 
     pos_idxs = [1, 2, 3, 4, 8, 16]
